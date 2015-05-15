@@ -7,7 +7,11 @@ output:
 
 
 ## Loading and preprocessing the data
+
+### Read in the data set.
+
 After unzipping the file, we read the data in and assign the correct class to each column. The dates are conveniently stored in the default form YYYY-MM-DD so we don't need any special arguments to convert that column to class Date. 
+
 ```{r}
 unzip("activity.zip")
 raw_data <- read.csv("activity.csv", header=TRUE, stringsAsFactors=FALSE,
@@ -22,9 +26,7 @@ head(raw_data)
 We're told that we can ignore the missing values for this part.
 It appears that the only column to have missing values is the steps column:
 ```{r}
-any(is.na(raw_data$steps))
-any(is.na(raw_data$date))
-any(is.na(raw_data$interval))
+c(any(is.na(raw_data$steps)), any(is.na(raw_data$date)), any(is.na(raw_data$interval)))
 ```
 
 For this question, since we're told to ignore missing values, we'll keep only the complete cases:
@@ -37,6 +39,7 @@ sum of the steps column, grouped by date.
 totalsteps <- tapply(completedata$steps, completedata$date, sum)
 ```
 
+### Histogram of total number of steps taken each day.
 
 Here's a histogram of the total number of steps taken each day. I 
 played with the "breaks" argument until I liked the histogram.
@@ -45,7 +48,7 @@ hist(totalsteps, breaks=seq(0, 25000, by=2500),
      xlab="Total Steps", main="Total Number of Steps Taken Each Day")
 ```
 
-Finally, here are the mean and mean and median of the total number of steps taken per day:
+### Calculate mean and median of total number of steps taken per day:
 ```{r}
 mean(totalsteps)
 median(totalsteps)
@@ -53,7 +56,25 @@ median(totalsteps)
 
 ## What is the average daily activity pattern?
 
+We make a time series plot of the 5-minute interval (x-axis) and the average number of steps taken, averaged across all days (y-axis): 
+```{r}
+# Compute the average steps, grouped by interval
+activity <- as.data.frame(tapply(completedata$steps, completedata$interval, mean))
+names(activity) <- c("average")
+# Add a column for intervals as integers, so points get plotted in the right order.
+activity$interval <- as.integer(rownames(activity))
+plot(activity$interval, activity$average, type='l', xlab="Interval", ylab="Average # of steps")
+```
 
+### Which 5-minute interval, on average across all the days in the dataset, contains the maximum number of steps?
+```{r}
+# Find the maximum average steps
+maxnum <- max(activity$average) 
+# Find the interval(s) that take that value
+indices <- which(activity$average==maxnum)
+activity$interval[indices]
+```
+It appears to be interval 835, corresponding to the five-minute interval starting at 8:35am.
 
 ## Imputing missing values
 
