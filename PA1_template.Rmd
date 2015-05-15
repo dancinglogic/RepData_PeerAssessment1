@@ -7,12 +7,49 @@ output:
 
 
 ## Loading and preprocessing the data
+After unzipping the file, we read the data in and assign the correct class to each column. The dates are conveniently stored in the default form YYYY-MM-DD so we don't need any special arguments to convert that column to class Date. 
+```{r}
+unzip("activity.zip")
+raw_data <- read.csv("activity.csv", header=TRUE, stringsAsFactors=FALSE,
+                          colClasses=c("integer", "Date", "integer"))
+```
+Let's see what the data looks like:
+```{r}
+head(raw_data)
+```
+
+## What is the mean total number of steps taken per day?
+We're told that we can ignore the missing values for this part.
+It appears that the only column to have missing values is the steps column:
+```{r}
+any(is.na(raw_data$steps))
+any(is.na(raw_data$date))
+any(is.na(raw_data$interval))
+```
+
+For this question, since we're told to ignore missing values, we'll keep only the complete cases:
+```{r}
+completedata <- raw_data[complete.cases(raw_data), ]
+```
+To calculate the total number of steps taken per day we want to take the
+sum of the steps column, grouped by date.
+```{r}
+totalsteps <- tapply(completedata$steps, completedata$date, sum)
+```
 
 
+Here's a histogram of the total number of steps taken each day. I 
+played with the "breaks" argument until I liked the histogram.
+```{r}
+hist(totalsteps, breaks=seq(0, 25000, by=2500),
+     xlab="Total Steps", main="Total Number of Steps Taken Each Day")
+```
 
-## What is mean total number of steps taken per day?
-
-
+Finally, here are the mean and mean and median of the total number of steps taken per day:
+```{r}
+mean(totalsteps)
+median(totalsteps)
+```
 
 ## What is the average daily activity pattern?
 
