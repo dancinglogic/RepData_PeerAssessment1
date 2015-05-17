@@ -92,16 +92,34 @@ median(totalsteps)
 
 ### Time series plot of average number of steps taken
 
-We make a time series plot of the 5-minute interval (x-axis) and the average number of steps taken, averaged across all days (y-axis): 
+We make a time series plot of the 5-minute interval (x-axis) and the average number of steps taken, averaged across all days (y-axis). 
+
+The x-axis is labeled by which interval of the day it is, from 1 to 288 (because the number of minutes in a day is (60 minutes per hour) * (24 hours per day) = 1440, and then (1440 minutes per day) / (5 minutes per interval) = 288 intervals per day).
+
+Converting the interval directly to an integer and using that on the x-axis would result in an incorrect and funny-looking graph. For example, we have interval 55 for 00:55am, and then interval 100 for 1:00am.  If we tried to graph using a direct translation of the intervals to integers, this would give us a point with x=55 and  a point with x=100, but no points in between, creating artificial straight line segments in the graph.
+
+Since the activity data frame is in order by interval, we can just create a sequence from 1:288 for the x values.
 
 
 ```r
 # Compute the average steps, grouped by interval
 activity <- as.data.frame(tapply(completedata$steps, completedata$interval, mean))
 names(activity) <- c("average")
-# Add a column for intervals as integers, so points get plotted in the right order.
-activity$interval <- as.integer(rownames(activity))
-plot(activity$interval, activity$average, type='l', xlab="Interval", ylab="Average # of steps")
+# The row names of the activity data frame are now the intervals. 
+# Confirm that these row names, interpreted as integers, are in order.
+all(row.names(activity)==sort(as.integer(row.names(activity))))
+```
+
+```
+## [1] TRUE
+```
+
+```r
+# Add a column for which number interval it is
+activity$intervalnum <- seq(along.with=activity$average)
+# Plot
+plot(activity$intervalnum, activity$average, type='l', 
+     xlab="Number of Interval", ylab="Average # of steps", xlim=c(1,288))
 ```
 
 ![plot of chunk unnamed-chunk-8](figure/unnamed-chunk-8-1.png) 
@@ -111,13 +129,15 @@ plot(activity$interval, activity$average, type='l', xlab="Interval", ylab="Avera
 ```r
 # Find the maximum average steps
 maxnum <- max(activity$average) 
-# Find the interval(s) that take that value
+# Find the interval(s) that take that value. The row names are the intervals, 
+# but let's make a column named interval for ease later.
+activity$interval <- row.names(activity)
 indices <- which(activity$average==maxnum)
 activity$interval[indices]
 ```
 
 ```
-## [1] 835
+## [1] "835"
 ```
 It appears to be interval 835, corresponding to the five-minute interval starting at 8:35am.
 
@@ -217,25 +237,22 @@ Now make a panel plot containing a time series plot of the 5-minute interval (x-
 # Have to recompute averages with values grouped by both interval and whether it's a weekday or weekend.
 avpertype <- with(new_data, tapply(fixed_steps, INDEX=list(interval, typeofday), FUN=mean))
 avpertype <- as.data.frame(avpertype)
-avpertype$interval <- as.integer(rownames(avpertype))
+# Add a column including which number interval each row is
+avpertype$intervalnum <- sapply(row.names(avpertype),
+                                    function(x) {
+                                    index <- which(activity$interval==x)
+                                    activity$intervalnum[index]
+                                })
 # Reshape the dataframe so that we have a column with type of day 
 # that the lattice package can use for grouping data.
 library(reshape2)
 library(lattice)
-toplot <- melt(avpertype, id=c("interval"))
-names(toplot) <- c("interval", "typeofday", "avsteps")
-class(toplot$interval)
-```
-
-```
-## [1] "integer"
-```
-
-```r
-xyplot(avsteps ~ interval | typeofday, data=toplot, type='l', 
-       xlab="Interval", ylab="Number of Steps", layout=c(1,2))
+toplot <- melt(avpertype, id=c("intervalnum"))
+names(toplot) <- c("intervalnum", "typeofday", "avsteps")
+xyplot(avsteps ~ intervalnum | typeofday, data=toplot, type='l', 
+       xlab="Number of Interval", ylab="Number of Steps", layout=c(1,2))
 ```
 
 ![plot of chunk unnamed-chunk-16](figure/unnamed-chunk-16-1.png) 
 
-This looks reasonable.  On weekends people start taking steps later in the day (maybe they sleep in), and then they take steps throughout the day.  On weekdays there's a big spike around 8 or 9 in the morning, when people would likely be going to work, and then not as many steps in the middle of the day (when they're probably at a desk) as there are on weekends. Of course, in saying this I'm making the assumption that the time intervals correspond to the local time zone of the participants in question.
+This looks reasonable.  On weekends people start taking steps later in the day (maybe they sleep in), and then they take steps throughout the day.  On weekdays there's a big spike possibly corresponding to when people would likely be going to work, and then not as many steps in the middle of the day (when they're probably at a desk) as there are on weekends. 
