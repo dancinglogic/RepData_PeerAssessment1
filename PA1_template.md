@@ -213,8 +213,130 @@ median(new_totalsteps)
 ## [1] 10766.19
 ```
 
-The mean is the same as it was before missing values were filled in, while the median has changed slightly.
+The mean is the same as it was before missing values were filled in, while the median has changed slightly. Let's think about why this should make sense.
 
+### Why is the mean the same and the median different?
+
+First let's understand where we filled in missing values. We look at the dates with values of NA in the "steps" field. For each of these dates, it turns out that all the step values were NA. We'll call these the "missing data" days. There are 8 of them.
+
+
+```r
+# For which dates did we have NA values?
+dates_with_na <- unique(new_data$date[which(is.na(new_data$steps))])
+length(dates_with_na)
+```
+
+```
+## [1] 8
+```
+
+```r
+# get the data from those dates, and see if ALL the data on those dates was NA
+all(is.na(new_data[new_data$date %in% dates_with_na,]$steps))
+```
+
+```
+## [1] TRUE
+```
+
+#### Why the mean didn't change
+
+Now, how did we compute the mean total steps per day when we were ignoring missing values?
+
+The mean total number of steps per day is given by the formula
+$$ \frac{1}{n} \left(\sum_{d=1}^{n} \sum_{i=1}^{288} x^d_i \right)$$
+where $n$ is the number of days (with no missing data) and $x^d_i$ is the number of steps taken on day $d$ during interval $i$.  The inner summation adds up the steps for each interval during day $d$ to find the total number of steps taken on day $d$. The outer summation adds up the total number of steps on each day, over all days. Finally we divide by $\frac{1}{n}$ to find the average total steps taken per day.
+
+Since the summations are finite, we can swap them and distribute the coefficient $\frac{1}{n}$ to get the equivalent formula
+$$\sum_{i=1}^{288} \left(\frac{1}{n} \sum_{d=1}^{n} x_i^d\right).$$
+This is still the mean total number of steps per day.  However, now the inner sum is taken over all days while interval $i$ is held fixed.  The multiplication by $\frac{1}{n}$ gives the mean number of steps taken during interval $i$ over all days. The outer sum takes the total, over all intervals, of the mean number of steps per interval.
+
+For the missing data days, we filled in the missing data for each interval by setting it equal to the mean number of steps taken on that interval (where the mean was taken over all the days that had data). Since *all* the data was missing on the missing data days, the number of steps for each interval $i$ was filled in with 
+$$\left(\frac{1}{n} \sum_{d=1}^{n} x_i^d\right).$$
+When we take the sum over all intervals, we find that the total number of steps taken on a missing data day will now come out to be
+$$\sum_{i=1}^{288} \left(\frac{1}{n} \sum_{d=1}^{n} x_i^d\right).$$
+As shown above, this is exactly the mean total steps we computed *before* filling in the missing data.
+
+To summarize: the total number of steps taken on a "missing data" day will now come out to be the same as the mean number of total steps per day we calculated when we were ignoring missing data.
+
+We can confirm in R that each of the missing data days now has the same total number of steps after we fill in the missing data:
+
+```r
+# Compute the indices with missing data
+indices_with_na <-new_data$date %in% dates_with_na
+# Confirm that ALL the data was missing on those days - ie the only value we see is "NA"
+unique(new_data$steps[indices_with_na]) 
+```
+
+```
+## [1] NA
+```
+
+```r
+# Confirm that each of these dates has the same total number of steps:
+unique(tapply(new_data$fixed_steps[indices_with_na], new_data$date[indices_with_na], sum))
+```
+
+```
+## 2012-10-01 
+##   10766.19
+```
+
+The only thing left is to show that if we have $n$ numbers with average $\mu$ and we combine them with 8 copies of $\mu$, the average won't change. Call the $n$ numbers $t_1, \dots t_n$.  Then by definition
+$$\frac{1}{n}\sum_{i=1}^n t_i=\mu$$
+so
+$$\sum_{i=1}^n t_i = \mu n.$$
+If we toss in 8 copies of $\mu$ and take the mean of the new collection, we are now finding the average of $n+8$ numbers and we get
+$$\frac{1}{n+8}\left(\sum_{i=1}^n t_i + 8\mu\right) = \frac{1}{n+8}\left(n\mu + 8\mu\right)$$
+which simplifies to
+$$\frac{1}{n+8}\cdot\mu (n+8) = \mu.$$
+Thus, the mean does not change when we recompute it for all days with the missing data filled in via the method described above.
+
+#### Why the median did change
+
+The median is the "middle" number. There were originally 53 days with data, and so if we sort the data the median is position 27. We can also look at the numbers to either side of the median.
+
+
+```r
+# This is the original median
+sort(totalsteps)[27]
+```
+
+```
+## 2012-11-12 
+##      10765
+```
+
+```r
+# Here are the numbers to either side of it
+sort(totalsteps)[26:28]
+```
+
+```
+## 2012-11-02 2012-11-12 2012-10-07 
+##      10600      10765      11015
+```
+
+The median of the original data was 10765  and the next largest value was 11015. The mean of the new data, after we fill in the missing data days, is $\mu=10766.19$:
+
+```r
+mean(new_totalsteps)
+```
+
+```
+## [1] 10766.19
+```
+
+When we fill in the missing data days, we're adding 8 copies of $\mu$ to the list of total steps taken per day.  In the new sorted list, these will occur 
+after the old median but before any of the other values. Originally we had
+$$ t_1, \dots, t_{25}, 10600, 10765, 11015, t_{28}, \dots, t_{53}.$$
+
+After replacing missing values the sorted list of total steps values is 
+$$ t_1, \dots, t_{25}, 10600, 10765, \mu, \mu, \mu, \mu, \mu, \mu, \mu, \mu, 11015, t_{28}, \dots, t_{53}.$$
+This new list is $53+8=61$ elements long. The new median, or "middle number," is now the 31st element,  shown in parentheses:
+$$ t_1, \dots, t_{25}, 10600, 10765, \mu, \mu, \mu, (\mu), \mu, \mu, \mu, \mu, 11015, t_{28}, \dots, t_{53}.$$
+
+We see it makes sense that the median changed.
 
 
 ## Are there differences in activity patterns between weekdays and weekends?
@@ -253,6 +375,6 @@ xyplot(avsteps ~ intervalnum | typeofday, data=toplot, type='l',
        xlab="Number of Interval", ylab="Number of Steps", layout=c(1,2))
 ```
 
-![plot of chunk unnamed-chunk-16](figure/unnamed-chunk-16-1.png) 
+![plot of chunk unnamed-chunk-20](figure/unnamed-chunk-20-1.png) 
 
 This looks reasonable.  On weekends people start taking steps later in the day (maybe they sleep in), and then they take steps throughout the day.  On weekdays there's a big spike possibly corresponding to when people would likely be going to work, and then not as many steps in the middle of the day (when they're probably at a desk) as there are on weekends. 
